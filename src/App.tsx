@@ -32,7 +32,8 @@ export function App() {
   const refEditorFrag = useRef<editor.IStandaloneCodeEditor>(null);
   const refCanvas = useRef<HTMLCanvasElement>(null);
   const refSceneRenderer = useRef<SceneRenderer | null>(null);
-  
+
+  // Initial / When Three.js revision changes
   useEffect(() => {
     (async () => {
       // Dispose existing renderer when revision changes
@@ -41,13 +42,22 @@ export function App() {
         refSceneRenderer.current = null;
       }
 
+      // Load selected three.js from CDN
       const revision = threeRevisions[threeRevision as ThreeRevision];
       const three = await import(getThreeUrl(`0.${revision}`)) as typeof THREE;
       setThree(three);
 
+      // Create new renderer
+      if (refCanvas.current) {
+        refSceneRenderer.current = new SceneRenderer(three, refCanvas.current);
+        refSceneRenderer.current.start();
+      }
+
+      // Set default shaders
       setCodeVert(replaceShaderChunks(three.ShaderLib[DEFAULT_MATERIAL_TYPE].vertexShader, three.ShaderChunk));
       setCodeFrag(replaceShaderChunks(three.ShaderLib[DEFAULT_MATERIAL_TYPE].fragmentShader, three.ShaderChunk));
 
+      // Fold includes in editors
       setTimeout(() => {
         if (refEditorVert.current) {
           foldIncludes(refEditorVert.current);
@@ -56,33 +66,32 @@ export function App() {
           foldIncludes(refEditorFrag.current);
         }
       }, 1000);
+
+      // Cleanup
+      return () => {
+        if (refSceneRenderer.current) {
+          refSceneRenderer.current.dispose();
+          refSceneRenderer.current = null;
+        }
+      };
     })();
   }, [threeRevision]);
 
-  useEffect(() => {
-    if (three && refCanvas.current && !refSceneRenderer.current) {
-      refSceneRenderer.current = new SceneRenderer(three, refCanvas.current);
-      refSceneRenderer.current.start();
-    }
-
-    return () => {
-      if (refSceneRenderer.current) {
-        refSceneRenderer.current.dispose();
-        refSceneRenderer.current = null;
-      }
-    };
-  }, [three]);
-
+  // When material type changes
   useEffect(() => {
     if (three && refSceneRenderer.current) {
+      // Load shaders from ShaderLib / Replace includes
       const vertexShader = replaceShaderChunks(three.ShaderLib[materialType].vertexShader, three.ShaderChunk);
       const fragmentShader = replaceShaderChunks(three.ShaderLib[materialType].fragmentShader, three.ShaderChunk);
-      
+
+      // Update code in editors
       setCodeVert(vertexShader);
       setCodeFrag(fragmentShader);
-      
+
+      // Update material in renderer
       refSceneRenderer.current.updateMaterial(vertexShader, fragmentShader, materialType as MaterialType);
 
+      // Fold includes in editors
       setTimeout(() => {
         if (refEditorVert.current) {
           foldIncludes(refEditorVert.current);
@@ -94,12 +103,14 @@ export function App() {
     }
   }, [three, materialType]);
 
+  // Update shaders in renderer when Ctrl+S or Ctrl+R is pressed
   const updateShaders = useCallback(() => {
     const codeVert = refEditorVert.current?.getValue() ?? '';
     const codeFrag = refEditorFrag.current?.getValue() ?? '';
     refSceneRenderer.current?.updateMaterial(codeVert, codeFrag, materialType as MaterialType);
   }, [materialType]);
 
+  // Init vert editor
   const handleEditorDidMountVert = useCallback((editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
     refEditorVert.current = editor;
 
@@ -107,6 +118,7 @@ export function App() {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, updateShaders);
   }, [updateShaders]);
 
+  // Init frag editor
   const handleEditorDidMountFrag = useCallback((editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
     refEditorFrag.current = editor;
 
@@ -114,18 +126,21 @@ export function App() {
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, updateShaders);
   }, [updateShaders]);
 
+  // Handle vert editor change
   const handleEditVert = useCallback((value: string | undefined) => {
     if (value) {
       setCodeVert(value);
     }
   }, []);
 
+  // Handle frag editor change
   const handleEditFrag = useCallback((value: string | undefined) => {
     if (value) {
       setCodeFrag(value);
     }
   }, []);
 
+  // Fold includes in editors
   const foldIncludes = useCallback(async (editor: editor.IStandaloneCodeEditor) => {
     const model = editor.getModel();
     if (model) {
