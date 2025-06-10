@@ -8,6 +8,7 @@ import { replaceShaderChunks } from './replaceShaderChunks';
 import { SceneRenderer } from './SceneRenderer';
 import { materialConfigs, type MaterialType } from './materialConfigs';
 import { threeRevisions, type ThreeRevision, DEFAULT_THREE_REVISION } from './threeRevisions';
+import { foldIncludes } from './foldIncludes';
 
 const DEFAULT_MATERIAL_TYPE = 'standard';
 
@@ -137,21 +138,6 @@ export function App() {
   const handleEditFrag = useCallback((value: string | undefined) => {
     if (value) {
       setCodeFrag(value);
-    }
-  }, []);
-
-  // Fold includes in editors
-  const foldIncludes = useCallback(async (editor: editor.IStandaloneCodeEditor) => {
-    const model = editor.getModel();
-    if (model) {
-      const lineCount = model.getLineCount();
-      for (let i = 1; i <= lineCount; i++) {
-        const lineContent = model.getLineContent(i);
-        if (lineContent.trim().startsWith('// #include')) {
-          editor.setSelection({ startLineNumber: i, startColumn: 1, endLineNumber: i, endColumn: 1 });
-          await editor.getAction('editor.fold')?.run();
-        }
-      }
     }
   }, []);
 
