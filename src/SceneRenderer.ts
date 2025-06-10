@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import uvGridPng from './assets/uv-grid.png';
+import { materialConfigs, type MaterialType } from './materialConfigs';
 
 export class SceneRenderer {
   private scene: THREE.Scene;
@@ -28,7 +29,7 @@ export class SceneRenderer {
 
     const geometry = new three.SphereGeometry(1, 32, 16);
     this.texture = new three.TextureLoader().load(uvGridPng);
-    const material = this._createMaterial(three.ShaderLib.phong.vertexShader, three.ShaderLib.phong.fragmentShader);
+    const material = this._createMaterial(three.ShaderLib.phong.vertexShader, three.ShaderLib.phong.fragmentShader, 'basic');
     this.sphere = new three.Mesh(geometry, material);
     this.scene.add(this.sphere);
 
@@ -68,8 +69,8 @@ export class SceneRenderer {
     }
   }
 
-  public updateMaterial(vertexShader: string, fragmentShader: string) {
-    this.sphere.material = this._createMaterial(vertexShader, fragmentShader);
+  public updateMaterial(vertexShader: string, fragmentShader: string, materialType: MaterialType) {
+    this.sphere.material = this._createMaterial(vertexShader, fragmentShader, materialType);
   }
 
   public dispose() {
@@ -78,10 +79,9 @@ export class SceneRenderer {
     this.renderer.dispose();
   }
 
-  private _createMaterial(vertexShader: string, fragmentShader: string) {
-    const material = new this.three.MeshPhongMaterial({
-      map: this.texture,
-    });
+  private _createMaterial(vertexShader: string, fragmentShader: string, materialType: MaterialType) {
+    const createMaterial = materialConfigs[materialType as MaterialType];
+    const material = createMaterial(this.three, this.texture);
 
     material.onBeforeCompile = (shader) => {
       shader.vertexShader = vertexShader;

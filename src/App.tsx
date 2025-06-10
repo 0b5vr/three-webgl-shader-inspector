@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type * as THREE from 'three';
-
+import { useControls } from 'leva';
 import { editor } from 'monaco-editor';
 import Editor, { type Monaco } from '@monaco-editor/react';
 import { getThreeUrl } from './getThreeUrl';
 import { replaceShaderChunks } from './replaceShaderChunks';
 import { SceneRenderer } from './SceneRenderer';
+import { materialConfigs, type MaterialType } from './materialConfigs';
+import { threeRevisions, type ThreeRevision, DEFAULT_THREE_REVISION } from './threeRevisions';
+
+const DEFAULT_MATERIAL_TYPE = 'standard';
 
 export function App() {
   const [three, setThree] = useState<typeof THREE | null>(null);
@@ -13,21 +17,37 @@ export function App() {
   const [codeVert, setCodeVert] = useState('');
   const [codeFrag, setCodeFrag] = useState('');
 
+  const { materialType, threeRevision } = useControls({
+    threeRevision: {
+      value: DEFAULT_THREE_REVISION,
+      options: Object.keys(threeRevisions),
+    },
+    materialType: {
+      value: DEFAULT_MATERIAL_TYPE,
+      options: Object.keys(materialConfigs),
+    }
+  });
+
   const refEditorVert = useRef<editor.IStandaloneCodeEditor>(null);
   const refEditorFrag = useRef<editor.IStandaloneCodeEditor>(null);
   const refCanvas = useRef<HTMLCanvasElement>(null);
   const refSceneRenderer = useRef<SceneRenderer | null>(null);
   
   useEffect(() => {
-    const revision = '177';
-
     (async () => {
+      // Dispose existing renderer when revision changes
+      if (refSceneRenderer.current) {
+        refSceneRenderer.current.dispose();
+        refSceneRenderer.current = null;
+      }
+
+      const revision = threeRevisions[threeRevision as ThreeRevision];
       const three = await import(getThreeUrl(`0.${revision}`)) as typeof THREE;
       setThree(three);
 
-      setCodeVert(replaceShaderChunks(three.ShaderLib.phong.vertexShader, three.ShaderChunk));
-      setCodeFrag(replaceShaderChunks(three.ShaderLib.phong.fragmentShader, three.ShaderChunk));
-      
+      setCodeVert(replaceShaderChunks(three.ShaderLib[DEFAULT_MATERIAL_TYPE].vertexShader, three.ShaderChunk));
+      setCodeFrag(replaceShaderChunks(three.ShaderLib[DEFAULT_MATERIAL_TYPE].fragmentShader, three.ShaderChunk));
+
       setTimeout(() => {
         if (refEditorVert.current) {
           foldIncludes(refEditorVert.current);
@@ -37,7 +57,7 @@ export function App() {
         }
       }, 1000);
     })();
-  }, [setThree]);
+  }, [threeRevision]);
 
   useEffect(() => {
     if (three && refCanvas.current && !refSceneRenderer.current) {
@@ -53,11 +73,32 @@ export function App() {
     };
   }, [three]);
 
+  useEffect(() => {
+    if (three && refSceneRenderer.current) {
+      const vertexShader = replaceShaderChunks(three.ShaderLib[materialType].vertexShader, three.ShaderChunk);
+      const fragmentShader = replaceShaderChunks(three.ShaderLib[materialType].fragmentShader, three.ShaderChunk);
+      
+      setCodeVert(vertexShader);
+      setCodeFrag(fragmentShader);
+      
+      refSceneRenderer.current.updateMaterial(vertexShader, fragmentShader, materialType as MaterialType);
+
+      setTimeout(() => {
+        if (refEditorVert.current) {
+          foldIncludes(refEditorVert.current);
+        }
+        if (refEditorFrag.current) {
+          foldIncludes(refEditorFrag.current);
+        }
+      }, 1000);
+    }
+  }, [three, materialType]);
+
   const updateShaders = useCallback(() => {
     const codeVert = refEditorVert.current?.getValue() ?? '';
     const codeFrag = refEditorFrag.current?.getValue() ?? '';
-    refSceneRenderer.current?.updateMaterial(codeVert, codeFrag);
-  }, []);
+    refSceneRenderer.current?.updateMaterial(codeVert, codeFrag, materialType as MaterialType);
+  }, [materialType]);
 
   const handleEditorDidMountVert = useCallback((editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
     refEditorVert.current = editor;
@@ -101,9 +142,6 @@ export function App() {
 
   return (
     <div className="flex h-screen w-screen bg-black">
-      <div className="flex-1 w-1/2 h-full border-r border-gray-700 relative">
-        <canvas ref={refCanvas} className="w-full h-full" />
-      </div>
       <div className="flex-1 w-1/2 h-full flex flex-col">
         <div className="flex-1 h-1/2 border-b border-gray-700">
           <Editor
@@ -139,6 +177,9 @@ export function App() {
             }}
           />
         </div>
+      </div>
+      <div className="flex-1 w-1/2 h-full border-r border-gray-700 relative">
+        <canvas ref={refCanvas} className="w-full h-full" />
       </div>
     </div>
   );
