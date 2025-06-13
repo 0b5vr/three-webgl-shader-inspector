@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type * as THREE from 'three';
-import { useControls } from 'leva';
+import { button, folder, useControls } from 'leva';
 import { getThreeUrl } from './getThreeUrl';
 import { replaceShaderChunks } from './replaceShaderChunks';
 import { SceneRenderer } from './SceneRenderer';
@@ -14,14 +14,19 @@ export function App() {
   const [three, setThree] = useState<typeof THREE | null>(null);
 
   const { materialType, threeRevision } = useControls({
-    threeRevision: {
-      value: DEFAULT_THREE_REVISION,
-      options: Object.keys(threeRevisions),
-    },
-    materialType: {
-      value: DEFAULT_MATERIAL_TYPE,
-      options: Object.keys(materialConfigs),
-    }
+    controls: folder({
+      threeRevision: {
+        value: DEFAULT_THREE_REVISION,
+        options: Object.keys(threeRevisions),
+      },
+      materialType: {
+        value: DEFAULT_MATERIAL_TYPE,
+        options: Object.keys(materialConfigs),
+      },
+    }),
+    links: folder({
+      'Source (GitHub)': button(() => window.open('https://github.com/0b5vr/three-webgl-shader-inspector', '_blank')),
+    }),
   });
 
   const refEditorVert = useRef<ShaderEditorHandle>(null);
