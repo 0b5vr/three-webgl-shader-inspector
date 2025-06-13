@@ -16,13 +16,13 @@ export class SceneRenderer {
 
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
-    
+
     this.camera = new three.PerspectiveCamera(75, width / height, 0.1, 1000);
     this.camera.position.set(0.0, 0.0, 2.0);
 
-    this.renderer = new three.WebGLRenderer({ 
+    this.renderer = new three.WebGLRenderer({
       canvas,
-      antialias: true 
+      antialias: true
     });
     this.renderer.setSize(width, height, false);
     this.renderer.setPixelRatio(window.devicePixelRatio);
